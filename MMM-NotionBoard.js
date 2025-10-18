@@ -7,6 +7,7 @@ Module.register("MMM-NotionBoard", {
 
   start: function () {
     this.tasks = {};
+    this.loaded = false;
     this.getData();
     setInterval(() => {
       this.getData();
@@ -24,6 +25,7 @@ Module.register("MMM-NotionBoard", {
   socketNotificationReceived: function (notification, payload) {
     if (notification === "NOTION_DATA") {
       this.tasks = payload;
+      this.loaded = true; // Track if data has been loaded
       this.updateDom();
     }
   },
@@ -31,22 +33,34 @@ Module.register("MMM-NotionBoard", {
   getDom: function () {
     const wrapper = document.createElement("div");
 
-    if (!this.tasks || Object.keys(this.tasks).length === 0) {
+    // Pre load
+    if (!this.loaded) {
       wrapper.innerHTML = "Loading Notion tasks…";
       return wrapper;
     }
 
+    // Load Title
     if (this.config.title) {
       const titleEl = document.createElement("h1");
       titleEl.innerText = this.config.title;
       titleEl.style.marginBottom = "5px";
       titleEl.style.textAlign = "start";
       wrapper.appendChild(titleEl);
-    }
+    } 
 
     const container = document.createElement("div");
     container.style.display = "flex";
     container.style.gap = "10px";
+    wrapper.appendChild(container);
+
+    // Load but no tasks
+    if (Object.keys(this.tasks).length === 0) {
+      const emptyEl = document.createElement("div");
+      emptyEl.innerText = "No tasks at the moment.";
+      container.appendChild(emptyEl);
+      return wrapper;
+    }
+
 
     for (const [status, items] of Object.entries(this.tasks)) {
       const col = document.createElement("div");
