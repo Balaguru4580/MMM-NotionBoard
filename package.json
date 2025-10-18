@@ -1,0 +1,9 @@
+{
+  "name": "MMM-NotionBoard",
+  "version": "1.0.0",
+  "description": "Display Notion database grouped by Status as Kanban columns",
+  "main": "MMM-NotionBoard.js",
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}
