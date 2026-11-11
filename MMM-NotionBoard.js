@@ -1,87 +1,148 @@
 Module.register("MMM-NotionBoard", {
-  defaults: {
-    secret: "",
-    databaseId: "",
-    updateInterval: 60000
-  },
+    defaults: {
+        secret: "",
+        databaseId: "",
+        updateInterval: 60000,
+        showDebug: false
+    },
 
-  start: function () {
-    this.tasks = {};
-    this.loaded = false;
-    this.getData();
-    setInterval(() => {
-      this.getData();
-    }, this.config.updateInterval);
-  },
+    start: function () {
+        this.tasks = {};
+        this.loaded = false;
+        this.errorMessage = null;
+        this.lastGoodAt = null;
+        this.truncated = false;
+        this.getData();
+        setInterval(() => {
+            this.getData();
+        }, this.config.updateInterval);
+    },
 
-  getData: function () {
-    this.sendSocketNotification("NOTION_REQUEST", {
-      secret: this.config.secret,
-      databaseId: this.config.databaseId,
-      showStatuses: this.config.showStatuses || null
-    });
-  },
+    getData: function () {
+        this.sendSocketNotification("NOTION_REQUEST", {
+            secret: this.config.secret,
+            databaseId: this.config.databaseId,
+            showStatuses: this.config.showStatuses || null
+        });
+    },
 
-  socketNotificationReceived: function (notification, payload) {
-    if (notification === "NOTION_DATA") {
-      this.tasks = payload;
-      this.loaded = true; // Track if data has been loaded
-      this.updateDom();
+    socketNotificationReceived: function (notification, payload) {
+        if (notification === "NOTION_DATA") {
+            this.tasks = (payload && payload.tasks) || {};
+            this.truncated = !!(payload && payload.truncated);
+            this.loaded = true;
+            this.errorMessage = null;
+            this.lastGoodAt = (payload && payload.at) || Date.now();
+            this.updateDom();
+        } else if (notification === "NOTION_ERROR") {
+            // Keep the last good columns on screen; say why they may be stale.
+            this.errorMessage = (payload && payload.message) || "Unknown Notion error";
+            this.updateDom();
+        }
+    },
+
+    timeAgo: function (ms) {
+        const mins = Math.floor((Date.now() - ms) / 60000);
+        if (mins < 1) return "just now";
+        if (mins === 1) return "1 min ago";
+        return mins + " min ago";
+    },
+
+    getDom: function () {
+        const wrapper = document.createElement("div");
+
+        if (this.config.showDebug) {
+            const debugDiv = document.createElement("div");
+            debugDiv.style.whiteSpace = "pre-wrap";
+            debugDiv.style.fontFamily = "monospace";
+            debugDiv.style.padding = "10px";
+            debugDiv.style.background = "rgba(0, 0, 0, 0.6)";
+            debugDiv.style.marginBottom = "10px";
+            debugDiv.style.border = "1px solid #666";
+
+            const debugInfo = {
+                loaded: this.loaded,
+                error: this.errorMessage,
+                truncated: this.truncated,
+                tasks: this.tasks,
+                config: {
+                    databaseId: this.config.databaseId
+                }
+            };
+
+            debugDiv.innerText = JSON.stringify(debugInfo, null, 2);
+            wrapper.appendChild(debugDiv);
+        }
+
+        if (this.config.title) {
+            const titleEl = document.createElement("h1");
+            titleEl.innerText = this.config.title;
+            titleEl.style.marginBottom = "5px";
+            titleEl.style.textAlign = "start";
+            wrapper.appendChild(titleEl);
+        }
+
+        if (this.errorMessage) {
+            const errEl = document.createElement("div");
+            errEl.className = "notionboard-error small";
+            errEl.style.marginBottom = "8px";
+            errEl.style.padding = "4px 8px";
+            errEl.style.borderLeft = "3px solid #f66";
+            errEl.innerText = this.errorMessage;
+            wrapper.appendChild(errEl);
+
+            if (this.lastGoodAt) {
+                const staleEl = document.createElement("div");
+                staleEl.className = "notionboard-stale xsmall dimmed";
+                staleEl.style.marginBottom = "8px";
+                staleEl.innerText = "Showing data from " + this.timeAgo(this.lastGoodAt);
+                wrapper.appendChild(staleEl);
+            }
+        }
+
+        if (this.truncated) {
+            const truncEl = document.createElement("div");
+            truncEl.className = "notionboard-truncated xsmall dimmed";
+            truncEl.style.marginBottom = "8px";
+            truncEl.innerText = "Too many cards, list is incomplete.";
+            wrapper.appendChild(truncEl);
+        }
+
+        if (!this.loaded) {
+            if (!this.errorMessage) {
+                wrapper.innerHTML += "Loading Notion tasks…";
+            }
+            return wrapper;
+        }
+
+        const container = document.createElement("div");
+        container.style.display = "flex";
+        container.style.gap = "10px";
+        wrapper.appendChild(container);
+
+        if (Object.keys(this.tasks).length === 0) {
+            const emptyEl = document.createElement("div");
+            emptyEl.innerText = "No tasks at the moment.";
+            container.appendChild(emptyEl);
+            return wrapper;
+        }
+
+        for (const [status, items] of Object.entries(this.tasks)) {
+            const col = document.createElement("div");
+            col.style.flex = "1";
+            col.style.minWidth = "150px";
+            const header = document.createElement("h2");
+            header.innerText = status;
+            col.appendChild(header);
+            items.forEach(item => {
+                const div = document.createElement("div");
+                div.innerText = item;
+                div.style.marginBottom = "8px";
+                col.appendChild(div);
+            });
+            container.appendChild(col);
+        }
+
+        return wrapper;
     }
-  },
-
-  getDom: function () {
-    const wrapper = document.createElement("div");
-
-    // Pre load
-    if (!this.loaded) {
-      wrapper.innerHTML = "Loading Notion tasks…";
-      return wrapper;
-    }
-
-    // Load Title
-    if (this.config.title) {
-      const titleEl = document.createElement("h1");
-      titleEl.innerText = this.config.title;
-      titleEl.style.marginBottom = "5px";
-      titleEl.style.textAlign = "start";
-      wrapper.appendChild(titleEl);
-    } 
-
-    const container = document.createElement("div");
-    container.style.display = "flex";
-    container.style.gap = "10px";
-    wrapper.appendChild(container);
-
-    // Load but no tasks
-    if (Object.keys(this.tasks).length === 0) {
-      const emptyEl = document.createElement("div");
-      emptyEl.innerText = "No tasks at the moment.";
-      container.appendChild(emptyEl);
-      return wrapper;
-    }
-
-
-    for (const [status, items] of Object.entries(this.tasks)) {
-      const col = document.createElement("div");
-      col.style.flex = "1";
-      col.style.minWidth = "150px";
-
-      const header = document.createElement("h2");
-      header.innerText = status;
-      col.appendChild(header);
-
-      items.forEach(item => {
-        const div = document.createElement("div");
-        div.innerText = item;
-        div.style.marginBottom = "8px";
-        col.appendChild(div);
-      });
-
-      container.appendChild(col);
-    }
-
-    wrapper.appendChild(container);
-    return wrapper;
-  }
 });
