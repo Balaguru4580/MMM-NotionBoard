@@ -7,7 +7,7 @@ Module.register("MMM-NotionBoard", {
         // Text colour per priority name. Anything not listed (Low, blank) keeps the
         // mirror's default colour, which is what "no priority" should look like.
         priorityColors: {
-            High: "#ff9a9a",
+            High: "#D12A00",
             Medium: "#b06a6a"
         }
     },
