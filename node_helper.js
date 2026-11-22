@@ -28,6 +28,27 @@ function getStatusName(prop) {
     }
 }
 
+// Priority is a plain select. A missing property and a blank value both mean "no priority".
+const PRIORITY_RANK = { high: 3, medium: 2, low: 1 };
+
+function getPriorityName(prop) {
+    if (!prop) return "";
+    switch (prop.type) {
+        case "select":
+            return prop.select?.name || "";
+        case "status":
+            return prop.status?.name || "";
+        case "multi_select":
+            return prop.multi_select?.[0]?.name || "";
+        default:
+            return "";
+    }
+}
+
+function priorityRank(priority) {
+    return PRIORITY_RANK[String(priority || "").toLowerCase()] || 0;
+}
+
 // One place that talks to Notion, so every failure carries a status and a readable reason.
 async function notionFetch(url, secret, body) {
     const options = {
@@ -137,11 +158,18 @@ module.exports = NodeHelper.create({
             allResults.forEach(page => {
                 const nameProp = page.properties?.Name?.title?.[0]?.plain_text || "Untitled";
                 const statusProp = getStatusName(page.properties?.Status);
+                const priority = getPriorityName(page.properties?.Priority);
 
                 if (!showStatuses || showStatuses.includes(statusProp)) {
                     if (!grouped[statusProp]) grouped[statusProp] = [];
-                    grouped[statusProp].push(nameProp);
+                    grouped[statusProp].push({ name: nameProp, priority: priority });
                 }
+            });
+
+            // High first, then medium, then low, then unranked. Array.sort is stable,
+            // so cards inside one tier keep the order Notion returned them in.
+            Object.values(grouped).forEach(items => {
+                items.sort((a, b) => priorityRank(b.priority) - priorityRank(a.priority));
             });
 
             this.sendSocketNotification("NOTION_DATA", {

@@ -1,6 +1,6 @@
 {
   "name": "MMM-NotionBoard",
-  "version": "1.0.0",
-  "description": "Display Notion database grouped by Status as Kanban columns",
+  "version": "1.1.0",
+  "description": "Display Notion database grouped by Status as Kanban columns, sorted and coloured by Priority",
   "main": "MMM-NotionBoard.js"
 }

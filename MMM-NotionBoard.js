@@ -3,7 +3,13 @@ Module.register("MMM-NotionBoard", {
         secret: "",
         databaseId: "",
         updateInterval: 60000,
-        showDebug: false
+        showDebug: false,
+        // Text colour per priority name. Anything not listed (Low, blank) keeps the
+        // mirror's default colour, which is what "no priority" should look like.
+        priorityColors: {
+            High: "#ff9a9a",
+            Medium: "#b06a6a"
+        }
     },
 
     start: function () {
@@ -46,6 +52,16 @@ Module.register("MMM-NotionBoard", {
         if (mins < 1) return "just now";
         if (mins === 1) return "1 min ago";
         return mins + " min ago";
+    },
+
+    priorityColor: function (priority) {
+        const colors = this.config.priorityColors || {};
+        const wanted = String(priority || "").toLowerCase();
+        if (!wanted) return null;
+        for (const name of Object.keys(colors)) {
+            if (name.toLowerCase() === wanted && colors[name]) return colors[name];
+        }
+        return null;
     },
 
     getDom: function () {
@@ -135,9 +151,15 @@ Module.register("MMM-NotionBoard", {
             header.innerText = status;
             col.appendChild(header);
             items.forEach(item => {
+                // Cards arrive as {name, priority}; a bare string is tolerated so an old
+                // helper half (or a stale payload) still renders instead of showing blanks.
+                const name = typeof item === "string" ? item : (item && item.name) || "";
+                const priority = typeof item === "string" ? "" : (item && item.priority) || "";
                 const div = document.createElement("div");
-                div.innerText = item;
+                div.innerText = name;
                 div.style.marginBottom = "8px";
+                const color = this.priorityColor(priority);
+                if (color) div.style.color = color;
                 col.appendChild(div);
             });
             container.appendChild(col);
