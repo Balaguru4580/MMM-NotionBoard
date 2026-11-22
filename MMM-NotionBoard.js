@@ -4,12 +4,15 @@ Module.register("MMM-NotionBoard", {
         databaseId: "",
         updateInterval: 60000,
         showDebug: false,
-        // Text colour per priority name. Anything not listed (Low, blank) keeps the
-        // mirror's default colour, which is what "no priority" should look like.
+        // Text colour per priority name. Anything not listed (Low, blank) gets
+        // defaultTextColor, which is what "no priority" should look like.
         priorityColors: {
             High: "#9C4F4F",
             Medium: "#c8984bc4"
-        }
+        },
+        // Pale green with the same lightness as the High red, so all three tiers read
+        // as one palette instead of one coloured card sitting in white text.
+        defaultTextColor: "#4F9C4F"
     },
 
     start: function () {
@@ -57,11 +60,11 @@ Module.register("MMM-NotionBoard", {
     priorityColor: function (priority) {
         const colors = this.config.priorityColors || {};
         const wanted = String(priority || "").toLowerCase();
-        if (!wanted) return null;
         for (const name of Object.keys(colors)) {
             if (name.toLowerCase() === wanted && colors[name]) return colors[name];
         }
-        return null;
+        // Low, blank, or an option nobody mapped: the neutral pale green.
+        return this.config.defaultTextColor || null;
     },
 
     getDom: function () {
